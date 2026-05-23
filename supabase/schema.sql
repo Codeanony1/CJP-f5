@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
   district TEXT,
   occupation TEXT,
   age INTEGER,
+  is_admin BOOLEAN DEFAULT FALSE,
   membership_status TEXT DEFAULT 'PENDING' CHECK (membership_status IN ('PENDING', 'APPROVED', 'REJECTED')),
   membership_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
