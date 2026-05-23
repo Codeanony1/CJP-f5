@@ -34,9 +34,14 @@ export default function DemandsPage() {
 
   useEffect(() => {
     const fetchAgendas = async () => {
-      const data = await getAgendas()
-      setAgendas(data as Agenda[])
-      setLoading(false)
+      try {
+        const data = await getAgendas()
+        setAgendas(data as Agenda[])
+      } catch (error) {
+        console.error('Error fetching agendas:', error)
+      } finally {
+        setLoading(false)
+      }
     }
     fetchAgendas()
   }, [])
