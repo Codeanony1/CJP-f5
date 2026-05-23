@@ -137,13 +137,6 @@ export default function ProfilePage() {
     setSaveMessage(null)
 
     try {
-      // First try to update
-      const { data: existingUser, error: fetchError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .single()
-
       const profileData = {
         id: user.id,
         email: user.email,
@@ -153,23 +146,13 @@ export default function ProfilePage() {
         district: formData.district,
         occupation: formData.occupation,
         age: formData.age ? parseInt(formData.age) : null,
+        membership_status: userData?.membership_status || 'PENDING',
       }
 
-      let error
-      if (existingUser) {
-        // Update existing profile
-        const result = await supabase
-          .from('users')
-          .update(profileData)
-          .eq('id', user.id)
-        error = result.error
-      } else {
-        // Insert new profile
-        const result = await supabase
-          .from('users')
-          .insert([{ ...profileData, membership_status: 'PENDING' }])
-        error = result.error
-      }
+      // Use upsert to handle both insert and update
+      const { error } = await supabase
+        .from('users')
+        .upsert(profileData, { onConflict: 'id' })
 
       if (error) {
         console.error('[v0] Error saving profile:', error)
@@ -445,18 +428,34 @@ export default function ProfilePage() {
           </Card>
 
           {/* Membership Card */}
-          <Card className="border-primary/50">
+          <Card className={userData?.membership_status === 'VERIFIED' ? 'border-primary/50' : 'border-yellow-500/30 bg-yellow-500/10'}>
             <CardHeader>
               <CardTitle>Generate Member Card</CardTitle>
               <CardDescription>Create a downloadable membership card</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-foreground/90 mb-4">
-                Generate a personalized member card that you can download and share.
-              </p>
-              <Link href="/profile/card">
-                <Button>Generate My Card</Button>
-              </Link>
+              {userData?.membership_status === 'VERIFIED' ? (
+                <>
+                  <p className="text-foreground/90 mb-4">
+                    Generate a personalized member card that you can download and share.
+                  </p>
+                  <Link href="/profile/card">
+                    <Button>Generate My Card</Button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <p className="text-foreground/90 mb-4">
+                    Your membership card will be available once your account is verified by an admin.
+                  </p>
+                  <p className="text-sm text-yellow-600 font-semibold">
+                    Current Status: {userData?.membership_status || 'PENDING'}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Please wait for admin verification to enable card generation.
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -16,6 +16,10 @@ export function Header() {
 
   useEffect(() => {
     const checkUser = async () => {
+      if (!supabase) {
+        setIsLoading(false)
+        return
+      }
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -26,6 +30,7 @@ export function Header() {
   }, [supabase])
 
   const handleLogout = async () => {
+    if (!supabase) return
     await supabase.auth.signOut()
     router.push('/')
     router.refresh()
@@ -37,13 +42,14 @@ export function Header() {
     <header className="sticky top-0 z-40 border-b border-border bg-card/80 backdrop-blur">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <Link href="/" className="flex items-center gap-2 font-bold text-xl text-primary">
+          <Link href="/" className="flex items-center gap-2 font-bold text-lg text-primary">
             <img
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/ChatGPT%20Image%20May%2022%2C%202026%2C%2003_06_58%20PM-photoaidcom-cropped-7VuOCUAx0hHA4wh6Hb2tjBFcyKNAgn.png"
-              alt="CJP"
+              alt="Cockroach Janta Party"
               className="h-10 w-10 object-contain"
             />
-            <span>CJP</span>
+            <span className="hidden sm:inline">Cockroach Janta Party (Youth Movement)</span>
+            <span className="sm:hidden">CJP</span>
           </Link>
 
           <nav className="hidden md:flex gap-6">

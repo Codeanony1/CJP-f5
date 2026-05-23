@@ -94,34 +94,25 @@ export default function SubmitVoicePage() {
   }
 
   const ensureUserProfile = async () => {
-    // Check if user profile exists, if not create it
-    const { data: existingProfile, error: fetchError } = await supabase
+    // Use upsert to ensure user profile exists
+    const { error: upsertError } = await supabase
       .from('users')
-      .select('id')
-      .eq('id', user.id)
-      .single()
+      .upsert({
+        id: user.id,
+        email: user.email,
+        full_name: formData.full_name || user.user_metadata?.full_name || '',
+        occupation: formData.occupation || '',
+        state: formData.state || '',
+        district: formData.district || '',
+        age: formData.age ? parseInt(formData.age) : null,
+        membership_status: 'PENDING',
+      }, { onConflict: 'id' })
 
-    if (!existingProfile) {
-      // Create user profile
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert([{
-          id: user.id,
-          email: user.email,
-          full_name: formData.full_name || user.user_metadata?.full_name || '',
-          occupation: formData.occupation || '',
-          state: formData.state || '',
-          district: formData.district || '',
-          age: formData.age ? parseInt(formData.age) : null,
-          membership_status: 'PENDING',
-        }])
-
-      if (insertError) {
-        console.error('[v0] Error creating user profile:', insertError)
-        return false
-      }
-      console.log('[v0] User profile created successfully')
+    if (upsertError) {
+      console.error('[v0] Error ensuring user profile:', upsertError)
+      return false
     }
+    console.log('[v0] User profile ensured successfully')
     return true
   }
 

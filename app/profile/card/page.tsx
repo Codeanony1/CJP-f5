@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { createClient } from '@/lib/supabase/client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import html2canvas from 'html2canvas'
 
 interface UserData {
@@ -84,6 +85,37 @@ export default function MemberCardPage() {
         <div className="flex items-center justify-center py-12">
           <div className="text-muted-foreground">Loading...</div>
         </div>
+      </div>
+    )
+  }
+
+  // Check if user's membership status is VERIFIED
+  if (userData?.membership_status !== 'VERIFIED') {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <section className="py-12 md:py-16">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <Card className="border-yellow-500/30 bg-yellow-500/10">
+              <CardHeader>
+                <CardTitle className="text-yellow-600">Member Card Not Available</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-foreground/90">
+                  Your membership card will be available once your account is verified by an admin.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Current Status: <span className="font-semibold text-yellow-600">{userData?.membership_status || 'PENDING'}</span>
+                </p>
+                <div className="pt-4">
+                  <Link href="/profile">
+                    <Button variant="outline">Back to Profile</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
       </div>
     )
   }

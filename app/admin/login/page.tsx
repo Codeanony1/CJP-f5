@@ -35,21 +35,22 @@ export default function AdminLoginPage() {
       }
 
       if (data.user) {
-        // Check if user has admin privileges - check both user_metadata and app_metadata
-        // Also allow specific admin email as fallback
-        const isAdminByMetadata = 
-          data.user.user_metadata?.is_admin === true || 
-          data.user.app_metadata?.is_admin === true
-        const isAdminByEmail = data.user.email === 'admin@cjp.in'
-        const isAdmin = isAdminByMetadata || isAdminByEmail
-        
-        if (!isAdmin) {
+        // Check if user exists in admin_users table
+        const { data: adminUser, error: adminError } = await supabase
+          .from('admin_users')
+          .select('*')
+          .eq('email', data.user.email)
+          .single()
+
+        if (adminError || !adminUser) {
           setError('This account does not have admin privileges. Please use an admin account.')
           await supabase.auth.signOut()
           setLoading(false)
           return
         }
 
+        // Admin exists in admin_users table, proceed to admin dashboard
+        console.log('[v0] Admin login successful for:', data.user.email)
         router.push('/admin')
       } else {
         console.error('[v0] No user data returned from login')
