@@ -1,9 +1,10 @@
-import { createClient } from '@/lib/supabase/client'
-
-const supabase = createClient()
+import { createClient } from '@/lib/supabase/server'
 
 // Agendas/Demands functions
 export async function getAgendas() {
+  const supabase = await createClient()
+  if (!supabase) return []
+
   const { data, error } = await supabase
     .from('agendas')
     .select('*')
@@ -17,6 +18,9 @@ export async function getAgendas() {
 }
 
 export async function getAgendaById(id: string) {
+  const supabase = await createClient()
+  if (!supabase) return null
+
   const { data, error } = await supabase.from('agendas').select('*').eq('id', id).single()
 
   if (error) {
@@ -28,6 +32,9 @@ export async function getAgendaById(id: string) {
 
 // Youth Voices functions
 export async function getApprovedVoices() {
+  const supabase = await createClient()
+  if (!supabase) return []
+
   const { data, error } = await supabase
     .from('youth_voices')
     .select(
@@ -49,6 +56,9 @@ export async function getApprovedVoices() {
 }
 
 export async function getUserVoices(userId: string) {
+  const supabase = await createClient()
+  if (!supabase) return []
+
   const { data, error } = await supabase
     .from('youth_voices')
     .select(
@@ -74,6 +84,9 @@ export async function submitVoice(
   content: string,
   isAnonymous: boolean
 ) {
+  const supabase = await createClient()
+  if (!supabase) return null
+
   const { data, error } = await supabase
     .from('youth_voices')
     .insert([
@@ -96,6 +109,9 @@ export async function submitVoice(
 
 // Admin functions
 export async function getPendingVoices() {
+  const supabase = await createClient()
+  if (!supabase) return []
+
   const { data, error } = await supabase
     .from('youth_voices')
     .select(
@@ -115,6 +131,9 @@ export async function getPendingVoices() {
 }
 
 export async function approveVoice(voiceId: string) {
+  const supabase = await createClient()
+  if (!supabase) return false
+
   const { error } = await supabase
     .from('youth_voices')
     .update({ status: 'APPROVED' })
@@ -128,6 +147,9 @@ export async function approveVoice(voiceId: string) {
 }
 
 export async function rejectVoice(voiceId: string) {
+  const supabase = await createClient()
+  if (!supabase) return false
+
   const { error } = await supabase
     .from('youth_voices')
     .update({ status: 'REJECTED' })
@@ -146,6 +168,9 @@ export async function createAgenda(
   category: string,
   priority: number = 100
 ) {
+  const supabase = await createClient()
+  if (!supabase) return null
+
   const {
     data: { user },
   } = await supabase.auth.getUser()
