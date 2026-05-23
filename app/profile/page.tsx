@@ -428,18 +428,34 @@ export default function ProfilePage() {
           </Card>
 
           {/* Membership Card */}
-          <Card className="border-primary/50">
+          <Card className={userData?.membership_status === 'VERIFIED' ? 'border-primary/50' : 'border-yellow-500/30 bg-yellow-500/10'}>
             <CardHeader>
               <CardTitle>Generate Member Card</CardTitle>
               <CardDescription>Create a downloadable membership card</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-foreground/90 mb-4">
-                Generate a personalized member card that you can download and share.
-              </p>
-              <Link href="/profile/card">
-                <Button>Generate My Card</Button>
-              </Link>
+              {userData?.membership_status === 'VERIFIED' ? (
+                <>
+                  <p className="text-foreground/90 mb-4">
+                    Generate a personalized member card that you can download and share.
+                  </p>
+                  <Link href="/profile/card">
+                    <Button>Generate My Card</Button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <p className="text-foreground/90 mb-4">
+                    Your membership card will be available once your account is verified by an admin.
+                  </p>
+                  <p className="text-sm text-yellow-600 font-semibold">
+                    Current Status: {userData?.membership_status || 'PENDING'}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Please wait for admin verification to enable card generation.
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
