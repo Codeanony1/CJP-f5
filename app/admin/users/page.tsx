@@ -28,6 +28,8 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [updateError, setUpdateError] = useState<string | null>(null)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -95,10 +97,23 @@ export default function UsersPage() {
   }, [search, statusFilter, users])
 
   const handleUpdateStatus = async (userId: string, newStatus: string) => {
-    const { error } = await supabase.from('users').update({ membership_status: newStatus }).eq('id', userId)
+    setActionLoading(userId)
+    setUpdateError(null)
+    
+    try {
+      const { error } = await supabase.from('users').update({ membership_status: newStatus }).eq('id', userId)
 
-    if (!error) {
-      setUsers(users.map((u) => (u.id === userId ? { ...u, membership_status: newStatus } : u)))
+      if (error) {
+        console.error('[v0] Update error:', error)
+        setUpdateError(`Failed to update status: ${error.message}`)
+      } else {
+        setUsers(users.map((u) => (u.id === userId ? { ...u, membership_status: newStatus } : u)))
+      }
+    } catch (err) {
+      console.error('[v0] Unexpected error:', err)
+      setUpdateError('An unexpected error occurred')
+    } finally {
+      setActionLoading(null)
     }
   }
 
@@ -218,6 +233,13 @@ export default function UsersPage() {
           </div>
         </div>
 
+        {/* Error Message */}
+        {updateError && (
+          <div className="bg-red-500/10 border border-red-500/30 text-red-600 p-4 rounded-lg">
+            <p className="font-medium">{updateError}</p>
+          </div>
+        )}
+
         {/* Members Table */}
         <div className="border border-border rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
@@ -252,15 +274,17 @@ export default function UsersPage() {
                               size="sm"
                               className="bg-green-600 hover:bg-green-700"
                               onClick={() => handleUpdateStatus(user.id, 'VERIFIED')}
+                              disabled={actionLoading === user.id}
                             >
-                              Verify
+                              {actionLoading === user.id ? 'Processing...' : 'Verify'}
                             </Button>
                             <Button
                               size="sm"
                               variant="destructive"
                               onClick={() => handleUpdateStatus(user.id, 'REJECTED')}
+                              disabled={actionLoading === user.id}
                             >
-                              Reject
+                              {actionLoading === user.id ? 'Processing...' : 'Reject'}
                             </Button>
                           </div>
                         )}
