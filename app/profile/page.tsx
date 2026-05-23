@@ -137,13 +137,6 @@ export default function ProfilePage() {
     setSaveMessage(null)
 
     try {
-      // First try to update
-      const { data: existingUser, error: fetchError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .single()
-
       const profileData = {
         id: user.id,
         email: user.email,
@@ -153,23 +146,13 @@ export default function ProfilePage() {
         district: formData.district,
         occupation: formData.occupation,
         age: formData.age ? parseInt(formData.age) : null,
+        membership_status: userData?.membership_status || 'PENDING',
       }
 
-      let error
-      if (existingUser) {
-        // Update existing profile
-        const result = await supabase
-          .from('users')
-          .update(profileData)
-          .eq('id', user.id)
-        error = result.error
-      } else {
-        // Insert new profile
-        const result = await supabase
-          .from('users')
-          .insert([{ ...profileData, membership_status: 'PENDING' }])
-        error = result.error
-      }
+      // Use upsert to handle both insert and update
+      const { error } = await supabase
+        .from('users')
+        .upsert(profileData, { onConflict: 'id' })
 
       if (error) {
         console.error('[v0] Error saving profile:', error)

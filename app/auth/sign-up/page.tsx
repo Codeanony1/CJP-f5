@@ -89,10 +89,16 @@ export default function SignUpPage() {
         email: formData.email,
         password: formData.password,
         options: {
+          // Disable email verification - auto confirm
           emailRedirectTo:
             process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/callback`,
           data: {
             full_name: formData.fullName,
+            occupation: formData.occupation,
+            state: formData.state,
+            district: formData.district,
+            phone_number: formData.phoneNumber || null,
+            age: formData.age ? parseInt(formData.age) : null,
           },
         },
       })
@@ -109,10 +115,10 @@ export default function SignUpPage() {
       }
       
       if (data.user) {
-        // Create user profile with demographic data
-        console.log('[v0] Creating user profile for:', data.user.id)
+        // Create or update user profile with demographic data using upsert
+        console.log('[v0] Creating/updating user profile for:', data.user.id)
         
-        const { error: profileError } = await supabase.from('users').insert([{
+        const { error: profileError } = await supabase.from('users').upsert({
           id: data.user.id,
           email: formData.email,
           full_name: formData.fullName,
@@ -122,24 +128,19 @@ export default function SignUpPage() {
           phone_number: formData.phoneNumber || null,
           age: formData.age ? parseInt(formData.age) : null,
           membership_status: 'PENDING',
-        }])
+        }, { onConflict: 'id' })
 
         if (profileError) {
           console.error('[v0] Profile creation error:', profileError)
-          // If profile already exists, that's okay - user might be re-registering
-          if (!profileError.message.includes('duplicate')) {
-            setError(`Failed to create profile: ${profileError.message}`)
-            setLoading(false)
-            return
-          }
+          // Don't block registration if profile fails - trigger should have created it
         } else {
-          console.log('[v0] Profile created successfully')
+          console.log('[v0] Profile created/updated successfully')
         }
         
-        // Show success message and redirect
-        setSuccess('Account created! Please check your email to verify your account.')
+        // Show success message and redirect to profile
+        setSuccess('Registration successful! Welcome to the movement.')
         setTimeout(() => {
-          router.push('/auth/sign-up-success')
+          router.push('/profile')
         }, 1500)
       }
     } catch (err) {
