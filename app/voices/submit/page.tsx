@@ -5,10 +5,25 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/client'
-import { submitVoice } from '@/lib/db'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+
+const INDIAN_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
+  'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+  'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
+  'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+  'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
+  'Lakshadweep', 'Delhi', 'Puducherry', 'Ladakh', 'Jammu and Kashmir'
+]
+
+const OCCUPATIONS = [
+  'Student', 'Employed', 'Self-Employed', 'Farmer', 'Business Owner',
+  'Homemaker', 'Retired', 'Looking for Work', 'Other'
+]
 
 export default function SubmitVoicePage() {
   const router = useRouter()
@@ -22,6 +37,7 @@ export default function SubmitVoicePage() {
     title: '',
     content: '',
     isAnonymous: false,
+    full_name: '',
     occupation: '',
     state: '',
     district: '',
@@ -49,10 +65,18 @@ export default function SubmitVoicePage() {
           // Pre-fill form with user data
           setFormData((prev) => ({
             ...prev,
+            full_name: profile.full_name || '',
             occupation: profile.occupation || '',
             state: profile.state || '',
             district: profile.district || '',
             age: profile.age?.toString() || '',
+          }))
+        } else {
+          // Use auth metadata if no profile exists
+          const metadata = user.user_metadata
+          setFormData((prev) => ({
+            ...prev,
+            full_name: metadata?.full_name || '',
           }))
         }
       }
@@ -61,12 +85,44 @@ export default function SubmitVoicePage() {
     checkUser()
   }, [supabase, router])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
     setFormData((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
     }))
+  }
+
+  const ensureUserProfile = async () => {
+    // Check if user profile exists, if not create it
+    const { data: existingProfile, error: fetchError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', user.id)
+      .single()
+
+    if (!existingProfile) {
+      // Create user profile
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert([{
+          id: user.id,
+          email: user.email,
+          full_name: formData.full_name || user.user_metadata?.full_name || '',
+          occupation: formData.occupation || '',
+          state: formData.state || '',
+          district: formData.district || '',
+          age: formData.age ? parseInt(formData.age) : null,
+          membership_status: 'PENDING',
+        }])
+
+      if (insertError) {
+        console.error('[v0] Error creating user profile:', insertError)
+        return false
+      }
+      console.log('[v0] User profile created successfully')
+    }
+    return true
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -83,9 +139,37 @@ export default function SubmitVoicePage() {
       return
     }
 
+    if (!formData.full_name.trim()) {
+      setError('Your name is required')
+      return
+    }
+
+    if (!formData.occupation) {
+      setError('Please select your occupation')
+      return
+    }
+
+    if (!formData.state) {
+      setError('Please select your state')
+      return
+    }
+
+    if (!formData.district.trim()) {
+      setError('Please enter your district')
+      return
+    }
+
     setSubmitting(true)
 
     try {
+      // Ensure user profile exists before submitting voice
+      const profileCreated = await ensureUserProfile()
+      if (!profileCreated) {
+        setError('Failed to create user profile. Please try again.')
+        setSubmitting(false)
+        return
+      }
+
       const voiceData = {
         user_id: user.id,
         title: formData.title,
@@ -160,31 +244,84 @@ export default function SubmitVoicePage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Demographic Context Section */}
+                {/* User Information Section */}
                 <div className="bg-secondary/10 border border-secondary/30 p-4 rounded-md">
-                  <h3 className="text-sm font-semibold mb-3">Voice Context (From Your Profile)</h3>
-                  <div className="grid md:grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Occupation</p>
-                      <p className="text-sm font-medium">{formData.occupation || 'Not provided'}</p>
+                  <h3 className="text-sm font-semibold mb-3">Your Information</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Full Name *</label>
+                      <Input
+                        type="text"
+                        name="full_name"
+                        placeholder="Your full name"
+                        value={formData.full_name}
+                        onChange={handleChange}
+                        required
+                        disabled={submitting}
+                      />
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Age</p>
-                      <p className="text-sm font-medium">{formData.age || 'Not provided'}</p>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Occupation *</label>
+                      <select
+                        name="occupation"
+                        value={formData.occupation}
+                        onChange={handleChange}
+                        required
+                        disabled={submitting}
+                        className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                      >
+                        <option value="">Select occupation</option>
+                        {OCCUPATIONS.map((occ) => (
+                          <option key={occ} value={occ}>{occ}</option>
+                        ))}
+                      </select>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">State</p>
-                      <p className="text-sm font-medium">{formData.state || 'Not provided'}</p>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Age</label>
+                      <Input
+                        type="number"
+                        name="age"
+                        placeholder="Your age"
+                        value={formData.age}
+                        onChange={handleChange}
+                        min="13"
+                        max="120"
+                        disabled={submitting}
+                      />
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">District</p>
-                      <p className="text-sm font-medium">{formData.district || 'Not provided'}</p>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">State *</label>
+                      <select
+                        name="state"
+                        value={formData.state}
+                        onChange={handleChange}
+                        required
+                        disabled={submitting}
+                        className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                      >
+                        <option value="">Select state</option>
+                        {INDIAN_STATES.map((state) => (
+                          <option key={state} value={state}>{state}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-sm font-medium">District *</label>
+                      <Input
+                        type="text"
+                        name="district"
+                        placeholder="Your district"
+                        value={formData.district}
+                        onChange={handleChange}
+                        required
+                        disabled={submitting}
+                      />
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Title</label>
+                  <label className="text-sm font-medium">Title *</label>
                   <Input
                     type="text"
                     name="title"
@@ -198,7 +335,7 @@ export default function SubmitVoicePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Your Voice</label>
+                  <label className="text-sm font-medium">Your Voice *</label>
                   <textarea
                     name="content"
                     placeholder="Share your demands, ideas, or vision in detail..."
@@ -229,7 +366,7 @@ export default function SubmitVoicePage() {
                   </label>
                 </div>
 
-                {error && <div className="text-sm text-red-600 bg-red-50 p-3 rounded">{error}</div>}
+                {error && <div className="text-sm text-red-600 bg-red-500/10 border border-red-500/30 p-3 rounded">{error}</div>}
 
                 <div className="flex gap-4 pt-4">
                   <Button type="submit" disabled={submitting} className="flex-1">

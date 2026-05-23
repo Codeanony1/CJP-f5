@@ -41,6 +41,7 @@ export default function SignUpPage() {
     age: '',
   })
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -51,6 +52,7 @@ export default function SignUpPage() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setSuccess(null)
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match')
@@ -62,9 +64,27 @@ export default function SignUpPage() {
       return
     }
 
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
+
     setLoading(true)
 
     try {
+      // First check if user already exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('email')
+        .eq('email', formData.email)
+        .single()
+
+      if (existingUser) {
+        setError('An account with this email already exists. Please log in instead.')
+        setLoading(false)
+        return
+      }
+
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -78,8 +98,17 @@ export default function SignUpPage() {
       })
 
       if (signUpError) {
-        setError(signUpError.message)
-      } else if (data.user) {
+        // Handle specific Supabase auth errors
+        if (signUpError.message.includes('already registered')) {
+          setError('An account with this email already exists. Please log in instead.')
+        } else {
+          setError(signUpError.message)
+        }
+        setLoading(false)
+        return
+      }
+      
+      if (data.user) {
         // Create user profile with demographic data
         console.log('[v0] Creating user profile for:', data.user.id)
         
@@ -97,14 +126,25 @@ export default function SignUpPage() {
 
         if (profileError) {
           console.error('[v0] Profile creation error:', profileError)
-          setError(`Failed to create profile: ${profileError.message}`)
+          // If profile already exists, that's okay - user might be re-registering
+          if (!profileError.message.includes('duplicate')) {
+            setError(`Failed to create profile: ${profileError.message}`)
+            setLoading(false)
+            return
+          }
         } else {
           console.log('[v0] Profile created successfully')
-          router.push('/auth/sign-up-success')
         }
+        
+        // Show success message and redirect
+        setSuccess('Account created! Please check your email to verify your account.')
+        setTimeout(() => {
+          router.push('/auth/sign-up-success')
+        }, 1500)
       }
     } catch (err) {
-      setError('An unexpected error occurred')
+      console.error('[v0] Unexpected error:', err)
+      setError('An unexpected error occurred. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -240,6 +280,7 @@ export default function SignUpPage() {
               </div>
             </div>
 
+            {success && <div className="text-sm text-green-600 bg-green-500/10 border border-green-500/30 p-3 rounded">{success}</div>}
             {error && <div className="text-sm text-red-600 bg-red-500/10 border border-red-500/30 p-3 rounded">{error}</div>}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Creating account...' : 'Create Account'}

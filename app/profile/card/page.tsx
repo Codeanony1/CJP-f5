@@ -60,6 +60,9 @@ export default function MemberCardPage() {
       const canvas = await html2canvas(cardRef.current, {
         backgroundColor: '#0f0f0f',
         scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
       })
 
       const link = document.createElement('a')
@@ -68,6 +71,7 @@ export default function MemberCardPage() {
       link.click()
     } catch (err) {
       console.error('Error generating card:', err)
+      alert('Failed to generate card. Please try again.')
     } finally {
       setDownloading(false)
     }
@@ -109,47 +113,55 @@ export default function MemberCardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="flex justify-center">
+              {/* Card uses inline styles for html2canvas compatibility */}
               <div
                 ref={cardRef}
-                className="w-full max-w-sm bg-gradient-to-br from-primary/20 to-accent/20 border-2 border-primary rounded-2xl p-8 text-center"
                 style={{
-                  backgroundImage: 'linear-gradient(135deg, rgba(255, 149, 0, 0.1) 0%, rgba(255, 107, 53, 0.1) 100%)',
+                  width: '100%',
+                  maxWidth: '384px',
+                  background: 'linear-gradient(135deg, rgba(255, 149, 0, 0.2) 0%, rgba(255, 107, 53, 0.2) 100%)',
+                  border: '2px solid #ff9500',
+                  borderRadius: '16px',
+                  padding: '32px',
+                  textAlign: 'center',
+                  backgroundColor: '#1a1a1a',
                 }}
               >
                 {/* Card Header with Logo */}
-                <div className="mb-8 pb-6 border-b border-primary/30 flex justify-center">
+                <div style={{ marginBottom: '32px', paddingBottom: '24px', borderBottom: '1px solid rgba(255, 149, 0, 0.3)', display: 'flex', justifyContent: 'center' }}>
                   <img
                     src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/ChatGPT%20Image%20May%2022%2C%202026%2C%2003_06_58%20PM-photoaidcom-cropped-7VuOCUAx0hHA4wh6Hb2tjBFcyKNAgn.png"
                     alt="CJP Logo"
-                    className="w-28 h-28 object-contain"
+                    style={{ width: '112px', height: '112px', objectFit: 'contain' }}
+                    crossOrigin="anonymous"
                   />
                 </div>
                 
-                <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-primary mb-1">CJP</h2>
-                  <p className="text-sm text-secondary font-semibold">Cockroach Janta Party</p>
+                <div style={{ marginBottom: '24px' }}>
+                  <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#ff9500', marginBottom: '4px' }}>CJP</h2>
+                  <p style={{ fontSize: '14px', color: '#138808', fontWeight: '600' }}>Cockroach Janta Party</p>
                 </div>
 
                 {/* Member Info */}
-                <div className="space-y-4 mb-8">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">MEMBER NAME</p>
-                    <h3 className="text-xl font-bold text-foreground">
+                <div style={{ marginBottom: '32px' }}>
+                  <div style={{ marginBottom: '16px' }}>
+                    <p style={{ fontSize: '12px', color: '#a0a0a0', marginBottom: '4px' }}>MEMBER NAME</p>
+                    <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#f5f5f5' }}>
                       {userData?.full_name || 'CJP Member'}
                     </h3>
                   </div>
 
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">MEMBERSHIP ID</p>
-                    <p className="text-sm font-mono text-accent">
+                  <div style={{ marginBottom: '16px' }}>
+                    <p style={{ fontSize: '12px', color: '#a0a0a0', marginBottom: '4px' }}>MEMBERSHIP ID</p>
+                    <p style={{ fontSize: '14px', fontFamily: 'monospace', color: '#ff6b35' }}>
                       {userData?.id?.substring(0, 12).toUpperCase() || 'XXXXXXXXXXXXX'}
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">JOINED</p>
-                      <p className="text-sm font-semibold text-foreground">
+                      <p style={{ fontSize: '12px', color: '#a0a0a0', marginBottom: '4px' }}>JOINED</p>
+                      <p style={{ fontSize: '14px', fontWeight: '600', color: '#f5f5f5' }}>
                         {userData?.membership_date
                           ? new Date(userData.membership_date).toLocaleDateString('en-US', {
                               year: 'numeric',
@@ -159,13 +171,13 @@ export default function MemberCardPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">STATUS</p>
+                      <p style={{ fontSize: '12px', color: '#a0a0a0', marginBottom: '4px' }}>STATUS</p>
                       <p
-                        className={`text-sm font-semibold ${
-                          userData?.membership_status === 'APPROVED'
-                            ? 'text-green-400'
-                            : 'text-yellow-400'
-                        }`}
+                        style={{
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          color: userData?.membership_status === 'APPROVED' ? '#4ade80' : '#facc15',
+                        }}
                       >
                         {userData?.membership_status || 'PENDING'}
                       </p>
@@ -174,12 +186,12 @@ export default function MemberCardPage() {
                 </div>
 
                 {/* Tagline */}
-                <div className="border-t border-primary/30 pt-6">
-                  <p className="text-xs text-muted-foreground mb-2">OUR MISSION</p>
-                  <p className="text-xs font-semibold text-foreground leading-relaxed">
+                <div style={{ borderTop: '1px solid rgba(255, 149, 0, 0.3)', paddingTop: '24px' }}>
+                  <p style={{ fontSize: '12px', color: '#a0a0a0', marginBottom: '8px' }}>OUR MISSION</p>
+                  <p style={{ fontSize: '12px', fontWeight: '600', color: '#f5f5f5', lineHeight: '1.5' }}>
                     Revolution and Youth Demand
                   </p>
-                  <p className="text-xs text-secondary mt-2">
+                  <p style={{ fontSize: '12px', color: '#138808', marginTop: '8px' }}>
                     United Voice • Equal Rights • Strong Nation
                   </p>
                 </div>

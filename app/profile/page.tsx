@@ -5,10 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getUserVoices } from '@/lib/db'
 
 interface UserData {
   id: string
@@ -40,6 +39,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [formData, setFormData] = useState({
     full_name: '',
     phone_number: '',
@@ -49,26 +49,54 @@ export default function ProfilePage() {
     age: '',
   })
 
+  const fetchUserData = useCallback(async (userId: string) => {
+    // Fetch user profile data
+    const { data: profileData, error: profileError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single()
+
+    if (profileError) {
+      console.log('[v0] No profile found for user, may need to create one')
+      return null
+    }
+
+    return profileData as UserData
+  }, [supabase])
+
+  const fetchUserVoices = useCallback(async (userId: string) => {
+    const { data: voicesData, error: voicesError } = await supabase
+      .from('youth_voices')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (voicesError) {
+      console.error('[v0] Error fetching voices:', voicesError)
+      return []
+    }
+
+    return voicesData as Voice[]
+  }, [supabase])
+
   useEffect(() => {
     const checkUser = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser()
+      
       if (!user) {
         router.push('/auth/login')
         return
       }
+      
       setUser(user)
 
-      // Fetch user profile data
-      const { data: profileData } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
+      const profileData = await fetchUserData(user.id)
+      
       if (profileData) {
-        setUserData(profileData as UserData)
+        setUserData(profileData)
         setFormData({
           full_name: profileData.full_name || '',
           phone_number: profileData.phone_number || '',
@@ -77,18 +105,28 @@ export default function ProfilePage() {
           occupation: profileData.occupation || '',
           age: profileData.age ? profileData.age.toString() : '',
         })
+      } else {
+        // User exists in auth but not in users table - use auth metadata
+        const metadata = user.user_metadata
+        setFormData({
+          full_name: metadata?.full_name || '',
+          phone_number: '',
+          state: '',
+          district: '',
+          occupation: '',
+          age: '',
+        })
       }
 
-      // Fetch user's voices
-      const userVoices = await getUserVoices(user.id)
-      setVoices(userVoices as Voice[])
+      const userVoices = await fetchUserVoices(user.id)
+      setVoices(userVoices)
 
       setLoading(false)
     }
     checkUser()
-  }, [supabase, router])
+  }, [supabase, router, fetchUserData, fetchUserVoices])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
@@ -96,36 +134,67 @@ export default function ProfilePage() {
   const handleSave = async () => {
     if (!user) return
     setSaving(true)
+    setSaveMessage(null)
 
     try {
-      const { error } = await supabase
+      // First try to update
+      const { data: existingUser, error: fetchError } = await supabase
         .from('users')
-        .update({
-          full_name: formData.full_name,
-          phone_number: formData.phone_number,
-          state: formData.state,
-          district: formData.district,
-          occupation: formData.occupation,
-          age: formData.age ? parseInt(formData.age) : null,
-        })
+        .select('id')
         .eq('id', user.id)
+        .single()
+
+      const profileData = {
+        id: user.id,
+        email: user.email,
+        full_name: formData.full_name,
+        phone_number: formData.phone_number,
+        state: formData.state,
+        district: formData.district,
+        occupation: formData.occupation,
+        age: formData.age ? parseInt(formData.age) : null,
+      }
+
+      let error
+      if (existingUser) {
+        // Update existing profile
+        const result = await supabase
+          .from('users')
+          .update(profileData)
+          .eq('id', user.id)
+        error = result.error
+      } else {
+        // Insert new profile
+        const result = await supabase
+          .from('users')
+          .insert([{ ...profileData, membership_status: 'PENDING' }])
+        error = result.error
+      }
 
       if (error) {
         console.error('[v0] Error saving profile:', error)
+        setSaveMessage({ type: 'error', text: `Failed to save: ${error.message}` })
       } else {
-        setUserData({
-          ...userData,
-          full_name: formData.full_name,
-          phone_number: formData.phone_number,
-          state: formData.state,
-          district: formData.district,
-          occupation: formData.occupation,
-          age: formData.age ? parseInt(formData.age) : null,
-        } as UserData)
+        // Re-fetch the user data to ensure we have the latest from database
+        const updatedProfile = await fetchUserData(user.id)
+        if (updatedProfile) {
+          setUserData(updatedProfile)
+          setFormData({
+            full_name: updatedProfile.full_name || '',
+            phone_number: updatedProfile.phone_number || '',
+            state: updatedProfile.state || '',
+            district: updatedProfile.district || '',
+            occupation: updatedProfile.occupation || '',
+            age: updatedProfile.age ? updatedProfile.age.toString() : '',
+          })
+        }
         setEditing(false)
+        setSaveMessage({ type: 'success', text: 'Profile saved successfully!' })
+        setTimeout(() => setSaveMessage(null), 3000)
       }
     } catch (err) {
       console.error('[v0] Unexpected error:', err)
+      setSaveMessage({ type: 'error', text: 'An unexpected error occurred' })
     } finally {
       setSaving(false)
     }
@@ -294,6 +363,17 @@ export default function ProfilePage() {
                   />
                 </div>
               </div>
+
+              {/* Save Message */}
+              {saveMessage && (
+                <div className={`text-sm p-3 rounded ${
+                  saveMessage.type === 'success' 
+                    ? 'text-green-600 bg-green-500/10 border border-green-500/30' 
+                    : 'text-red-600 bg-red-500/10 border border-red-500/30'
+                }`}>
+                  {saveMessage.text}
+                </div>
+              )}
 
               {/* Membership Status */}
               <div className="border-t border-border pt-4">
