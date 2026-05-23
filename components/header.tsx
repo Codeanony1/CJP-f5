@@ -16,6 +16,10 @@ export function Header() {
 
   useEffect(() => {
     const checkUser = async () => {
+      if (!supabase) {
+        setIsLoading(false)
+        return
+      }
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -26,6 +30,7 @@ export function Header() {
   }, [supabase])
 
   const handleLogout = async () => {
+    if (!supabase) return
     await supabase.auth.signOut()
     router.push('/')
     router.refresh()
