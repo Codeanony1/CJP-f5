@@ -1,4 +1,4 @@
--- Create users profile table
+-- Create users table
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT UNIQUE NOT NULL,
@@ -16,20 +16,18 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- Create agendas table for party demands
+-- Create agendas table
 CREATE TABLE IF NOT EXISTS agendas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   description TEXT,
   category TEXT,
   priority INTEGER DEFAULT 100,
-  status TEXT DEFAULT 'active',
-  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- Create youth_voices table for user submissions
+-- Create youth_voices table
 CREATE TABLE IF NOT EXISTS youth_voices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -55,8 +53,7 @@ CREATE TABLE IF NOT EXISTS voice_upvotes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   voice_id UUID NOT NULL REFERENCES youth_voices(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  UNIQUE(voice_id, user_id)
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
 -- Create admin_users table
@@ -67,103 +64,3 @@ CREATE TABLE IF NOT EXISTS admin_users (
   role TEXT DEFAULT 'moderator',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
--- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_membership_status ON users(membership_status);
-CREATE INDEX IF NOT EXISTS idx_agendas_category ON agendas(category);
-CREATE INDEX IF NOT EXISTS idx_agendas_status ON agendas(status);
-CREATE INDEX IF NOT EXISTS idx_youth_voices_user_id ON youth_voices(user_id);
-CREATE INDEX IF NOT EXISTS idx_youth_voices_status ON youth_voices(status);
-CREATE INDEX IF NOT EXISTS idx_voice_comments_voice_id ON voice_comments(voice_id);
-CREATE INDEX IF NOT EXISTS idx_voice_upvotes_voice_id ON voice_upvotes(voice_id);
-
--- Enable RLS (Row Level Security) on tables
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE agendas ENABLE ROW LEVEL SECURITY;
-ALTER TABLE youth_voices ENABLE ROW LEVEL SECURITY;
-ALTER TABLE voice_comments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE voice_upvotes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
-
--- Create RLS policies for users table
-CREATE POLICY "Users can view their own profile" ON users
-  FOR SELECT USING (auth.uid() = id);
-
-CREATE POLICY "Users can update their own profile" ON users
-  FOR UPDATE USING (auth.uid() = id);
-
-CREATE POLICY "Service role can manage all users" ON users
-  FOR ALL USING (auth.role() = 'service_role');
-
--- Create RLS policies for agendas table
-CREATE POLICY "Anyone can view agendas" ON agendas
-  FOR SELECT USING (true);
-
-CREATE POLICY "Service role can manage agendas" ON agendas
-  FOR ALL USING (auth.role() = 'service_role');
-
--- Create RLS policies for youth_voices table
-CREATE POLICY "Anyone can view approved voices" ON youth_voices
-  FOR SELECT USING (status = 'APPROVED' OR auth.uid() = user_id);
-
-CREATE POLICY "Users can create voices" ON youth_voices
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can view their own voices" ON youth_voices
-  FOR SELECT USING (auth.uid() = user_id OR status = 'APPROVED');
-
-CREATE POLICY "Service role can manage voices" ON youth_voices
-  FOR ALL USING (auth.role() = 'service_role');
-
--- Create RLS policies for voice_comments table
-CREATE POLICY "Anyone can view comments" ON voice_comments
-  FOR SELECT USING (true);
-
-CREATE POLICY "Users can create comments" ON voice_comments
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Service role can manage comments" ON voice_comments
-  FOR ALL USING (auth.role() = 'service_role');
-
--- Create RLS policies for voice_upvotes table
-CREATE POLICY "Anyone can view upvotes" ON voice_upvotes
-  FOR SELECT USING (true);
-
-CREATE POLICY "Users can create upvotes" ON voice_upvotes
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Service role can manage upvotes" ON voice_upvotes
-  FOR ALL USING (auth.role() = 'service_role');
-
--- Create RLS policies for admin_users table
-CREATE POLICY "Service role can manage admin users" ON admin_users
-  FOR ALL USING (auth.role() = 'service_role');
-
--- Create a trigger to auto-create user profile on auth signup
-CREATE OR REPLACE FUNCTION public.handle_new_user() 
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.users (id, email, full_name, created_at, updated_at)
-  VALUES (new.id, new.email, new.raw_user_meta_data->>'full_name', now(), now());
-  RETURN new;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Create the trigger
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
--- Insert sample data
-INSERT INTO agendas (title, description, category, priority) VALUES
-  (E'Affordable Education', E'Making quality education accessible to all youth across the nation', E'Education', 95),
-  (E'Climate Action', E'Implementing sustainable policies to combat climate change', E'Environment', 90),
-  (E'Healthcare for All', E'Ensuring universal healthcare coverage for youth and families', E'Healthcare', 85),
-  (E'Job Creation', E'Creating millions of new job opportunities in coming years', E'Economy', 88),
-  (E'Digital Infrastructure', E'Expanding broadband and digital access to rural areas', E'Technology', 80),
-  (E'Agricultural Support', E'Direct support and subsidies for young farmers', E'Agriculture', 75),
-  (E'Infrastructure Development', E'Building modern roads, railways and public transport', E'Infrastructure', 82),
-  (E'Justice Reform', E'Fast-track justice system reform for youth-related cases', E'Justice', 78)
-ON CONFLICT DO NOTHING;
