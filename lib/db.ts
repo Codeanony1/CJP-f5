@@ -152,7 +152,7 @@ export async function createAgenda(
 
   if (!user) {
     console.error('User not authenticated')
-    return null
+    return { error: 'User not authenticated', data: null }
   }
 
   const { data, error } = await supabase
@@ -164,13 +164,66 @@ export async function createAgenda(
         category,
         priority,
         created_by: user.id,
+        is_active: true,
       },
     ])
     .select()
 
   if (error) {
     console.error('Error creating agenda:', error)
-    return null
+    return { error: error.message, data: null }
   }
-  return data?.[0] || null
+  return { error: null, data: data?.[0] || null }
+}
+
+export async function updateAgenda(
+  id: string,
+  title: string,
+  description: string,
+  category: string,
+  priority: number
+) {
+  const { data, error } = await supabase
+    .from('agendas')
+    .update({
+      title,
+      description,
+      category,
+      priority,
+    })
+    .eq('id', id)
+    .select()
+
+  if (error) {
+    console.error('Error updating agenda:', error)
+    return { error: error.message, data: null }
+  }
+  return { error: null, data: data?.[0] || null }
+}
+
+export async function deleteAgenda(id: string) {
+  const { error } = await supabase
+    .from('agendas')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    console.error('Error deleting agenda:', error)
+    return { error: error.message, success: false }
+  }
+  return { error: null, success: true }
+}
+
+export async function toggleAgendaStatus(id: string, is_active: boolean) {
+  const { data, error } = await supabase
+    .from('agendas')
+    .update({ is_active })
+    .eq('id', id)
+    .select()
+
+  if (error) {
+    console.error('Error toggling agenda status:', error)
+    return { error: error.message, data: null }
+  }
+  return { error: null, data: data?.[0] || null }
 }

@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/client'
-import { getAgendas, createAgenda } from '@/lib/db'
+import { getAgendas, createAgenda, updateAgenda, deleteAgenda, toggleAgendaStatus } from '@/lib/db'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, FileText } from 'lucide-react'
+import { Plus, FileText, Edit2, Trash2, Eye, EyeOff } from 'lucide-react'
 
 interface Agenda {
   id: string
@@ -17,6 +17,7 @@ interface Agenda {
   category: string
   priority: number
   created_at: string
+  is_active?: boolean
 }
 
 const CATEGORIES = [
@@ -39,6 +40,9 @@ export default function AgendasPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -95,21 +99,98 @@ export default function AgendasPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
+    setMessage(null)
 
-    const result = await createAgenda(formData.title, formData.description, formData.category, formData.priority)
+    if (editingId) {
+      // Update existing agenda
+      const result = await updateAgenda(
+        editingId,
+        formData.title,
+        formData.description,
+        formData.category,
+        formData.priority
+      )
 
-    if (result) {
-      setAgendas([...agendas, result as Agenda])
-      setFormData({
-        title: '',
-        description: '',
-        category: 'Core Political & Constitutional Reforms',
-        priority: 100,
-      })
-      setShowForm(false)
+      if (result.error) {
+        setMessage({ type: 'error', text: `Failed to update: ${result.error}` })
+        console.error('[v0] Update error:', result.error)
+      } else {
+        setMessage({ type: 'success', text: 'Demand updated successfully!' })
+        setAgendas(agendas.map((a) => (a.id === editingId ? { ...a, ...formData } : a)))
+        resetForm()
+      }
+    } else {
+      // Create new agenda
+      const result = await createAgenda(
+        formData.title,
+        formData.description,
+        formData.category,
+        formData.priority
+      )
+
+      if (result.error) {
+        setMessage({ type: 'error', text: `Failed to create: ${result.error}` })
+        console.error('[v0] Create error:', result.error)
+      } else if (result.data) {
+        setMessage({ type: 'success', text: 'Demand created successfully!' })
+        setAgendas([...agendas, result.data as Agenda])
+        resetForm()
+      }
     }
 
     setSubmitting(false)
+  }
+
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      description: '',
+      category: 'Core Political & Constitutional Reforms',
+      priority: 100,
+    })
+    setShowForm(false)
+    setEditingId(null)
+  }
+
+  const handleEdit = (agenda: Agenda) => {
+    setFormData({
+      title: agenda.title,
+      description: agenda.description,
+      category: agenda.category,
+      priority: agenda.priority,
+    })
+    setEditingId(agenda.id)
+    setShowForm(true)
+  }
+
+  const handleDelete = async (agendaId: string) => {
+    if (!confirm('Are you sure you want to delete this demand?')) return
+
+    setActionLoading(agendaId)
+    const result = await deleteAgenda(agendaId)
+
+    if (result.error) {
+      setMessage({ type: 'error', text: `Failed to delete: ${result.error}` })
+    } else {
+      setMessage({ type: 'success', text: 'Demand deleted successfully!' })
+      setAgendas(agendas.filter((a) => a.id !== agendaId))
+    }
+    setActionLoading(null)
+  }
+
+  const handleToggleStatus = async (agenda: Agenda) => {
+    setActionLoading(agenda.id)
+    const result = await toggleAgendaStatus(agenda.id, !(agenda.is_active ?? true))
+
+    if (result.error) {
+      setMessage({ type: 'error', text: `Failed to update status: ${result.error}` })
+    } else {
+      setMessage({ type: 'success', text: `Demand ${result.data?.is_active ? 'activated' : 'deactivated'}!` })
+      setAgendas(
+        agendas.map((a) => (a.id === agenda.id ? { ...a, is_active: !(agenda.is_active ?? true) } : a))
+      )
+    }
+    setActionLoading(null)
   }
 
   if (loading) {
@@ -141,9 +222,20 @@ export default function AgendasPage() {
         {showForm && (
           <Card className="border-primary/50">
             <CardHeader>
-              <CardTitle>Add New Party Demand</CardTitle>
+              <CardTitle>{editingId ? 'Edit Party Demand' : 'Add New Party Demand'}</CardTitle>
             </CardHeader>
             <CardContent>
+              {message && (
+                <div
+                  className={`mb-4 p-4 rounded-lg ${
+                    message.type === 'success'
+                      ? 'bg-green-500/10 border border-green-500/30 text-green-600'
+                      : 'bg-red-500/10 border border-red-500/30 text-red-600'
+                  }`}
+                >
+                  {message.text}
+                </div>
+              )}
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Title</label>
@@ -206,9 +298,9 @@ export default function AgendasPage() {
 
                 <div className="flex gap-4 pt-4 border-t border-border">
                   <Button type="submit" disabled={submitting}>
-                    {submitting ? 'Creating...' : 'Create Demand'}
+                    {submitting ? 'Processing...' : editingId ? 'Update Demand' : 'Create Demand'}
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => setShowForm(false)} disabled={submitting}>
+                  <Button type="button" variant="outline" onClick={resetForm} disabled={submitting}>
                     Cancel
                   </Button>
                 </div>
@@ -247,11 +339,22 @@ export default function AgendasPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4">
+          <div className="space-y-4">
+            {message && (
+              <div
+                className={`p-4 rounded-lg ${
+                  message.type === 'success'
+                    ? 'bg-green-500/10 border border-green-500/30 text-green-600'
+                    : 'bg-red-500/10 border border-red-500/30 text-red-600'
+                }`}
+              >
+                {message.text}
+              </div>
+            )}
             {agendas
-              .sort((a, b) => a.priority - b.priority)
+              .sort((a, b) => b.priority - a.priority)
               .map((agenda, index) => (
-                <Card key={agenda.id} className="hover:border-primary/50 transition">
+                <Card key={agenda.id} className={`hover:border-primary/50 transition ${!agenda.is_active ? 'opacity-60' : ''}`}>
                   <CardContent className="pt-6">
                     <div className="flex gap-4">
                       <div className="flex-shrink-0 text-3xl font-bold text-muted-foreground/30 min-w-fit">
@@ -265,7 +368,45 @@ export default function AgendasPage() {
                           <span>Priority: {agenda.priority}</span>
                           <span>•</span>
                           <span>{new Date(agenda.created_at).toLocaleDateString()}</span>
+                          {!agenda.is_active && (
+                            <>
+                              <span>•</span>
+                              <span className="px-2 py-1 rounded bg-red-500/10 text-red-600">Inactive</span>
+                            </>
+                          )}
                         </div>
+                      </div>
+                      <div className="flex flex-col gap-2 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEdit(agenda)}
+                          disabled={actionLoading === agenda.id}
+                          className="flex items-center gap-2"
+                        >
+                          <Edit2 size={16} />
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={agenda.is_active ?? true ? 'outline' : 'default'}
+                          onClick={() => handleToggleStatus(agenda)}
+                          disabled={actionLoading === agenda.id}
+                          className="flex items-center gap-2"
+                        >
+                          {(agenda.is_active ?? true) ? <EyeOff size={16} /> : <Eye size={16} />}
+                          {(agenda.is_active ?? true) ? 'Deactivate' : 'Activate'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleDelete(agenda.id)}
+                          disabled={actionLoading === agenda.id}
+                          className="flex items-center gap-2"
+                        >
+                          <Trash2 size={16} />
+                          Delete
+                        </Button>
                       </div>
                     </div>
                   </CardContent>

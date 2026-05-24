@@ -30,6 +30,7 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [updateError, setUpdateError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -101,13 +102,20 @@ export default function UsersPage() {
     setUpdateError(null)
     
     try {
+      console.log('[v0] Updating user status:', { userId, newStatus })
       const { error } = await supabase.from('users').update({ membership_status: newStatus }).eq('id', userId)
 
       if (error) {
         console.error('[v0] Update error:', error)
         setUpdateError(`Failed to update status: ${error.message}`)
+        setSuccessMessage(null)
       } else {
+        console.log('[v0] Status updated successfully')
         setUsers(users.map((u) => (u.id === userId ? { ...u, membership_status: newStatus } : u)))
+        setSuccessMessage(`User status updated to ${newStatus}`)
+        setUpdateError(null) // Clear error on success
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccessMessage(null), 3000)
       }
     } catch (err) {
       console.error('[v0] Unexpected error:', err)
@@ -237,6 +245,13 @@ export default function UsersPage() {
         {updateError && (
           <div className="bg-red-500/10 border border-red-500/30 text-red-600 p-4 rounded-lg">
             <p className="font-medium">{updateError}</p>
+          </div>
+        )}
+
+        {/* Success Message */}
+        {successMessage && (
+          <div className="bg-green-500/10 border border-green-500/30 text-green-600 p-4 rounded-lg">
+            <p className="font-medium">{successMessage}</p>
           </div>
         )}
 

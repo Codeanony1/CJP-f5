@@ -24,7 +24,8 @@ interface Voice {
   age?: number
   is_anonymous?: boolean
   created_at: string
-  users?: {
+  user?: {
+    id: string
     full_name: string
     email: string
   }
@@ -70,10 +71,27 @@ export default function VoiceModerationPage() {
       }
 
       // Fetch voices
-      const { data: voicesData } = await supabase
+      const { data: voicesData, error: voicesError } = await supabase
         .from('youth_voices')
-        .select('*, users(full_name, email)')
+        .select(`
+          id,
+          title,
+          content,
+          user_id,
+          status,
+          occupation,
+          state,
+          district,
+          age,
+          is_anonymous,
+          created_at,
+          user:users(id, full_name, email)
+        `)
         .order('created_at', { ascending: false })
+
+      if (voicesError) {
+        console.error('[v0] Error fetching voices:', voicesError)
+      }
 
       if (voicesData) {
         setVoices(voicesData as Voice[])
@@ -99,7 +117,7 @@ export default function VoiceModerationPage() {
         (v) =>
           v.title.toLowerCase().includes(search.toLowerCase()) ||
           v.content.toLowerCase().includes(search.toLowerCase()) ||
-          v.users?.full_name?.toLowerCase().includes(search.toLowerCase())
+          v.user?.full_name?.toLowerCase().includes(search.toLowerCase())
       )
     }
 
@@ -240,7 +258,7 @@ export default function VoiceModerationPage() {
                       <CardTitle className="text-lg mb-2 break-words">{voice.title}</CardTitle>
                       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                         <span className="font-medium">
-                          {voice.users?.full_name || (voice.is_anonymous ? 'Anonymous' : 'Unknown')}
+                          {voice.user?.full_name || (voice.is_anonymous ? 'Anonymous' : 'Unknown')}
                         </span>
                         {voice.state && <span>•</span>}
                         {voice.state && <span>{voice.state}</span>}
