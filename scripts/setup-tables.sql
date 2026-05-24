@@ -158,12 +158,12 @@ CREATE TRIGGER on_auth_user_created
 
 -- Insert sample data
 INSERT INTO agendas (title, description, category, priority) VALUES
-  ('Affordable Education', 'Making quality education accessible to all youth across the nation', 'Education', 95),
-  ('Climate Action', 'Implementing sustainable policies to combat climate change', 'Environment', 90),
-  ('Healthcare for All', 'Ensuring universal healthcare coverage for youth and families', 'Healthcare', 85),
-  ('Job Creation', 'Creating 5 million new job opportunities in the next 3 years', 'Economy', 88),
-  ('Digital Infrastructure', 'Expanding broadband and digital access to rural areas', 'Technology', 80),
-  ('Agricultural Support', 'Direct support and subsidies for young farmers', 'Agriculture', 75),
-  ('Infrastructure Development', 'Building modern roads, railways and public transport', 'Infrastructure', 82),
-  ('Justice Reform', 'Fast-track justice system reform for youth-related cases', 'Justice', 78)
+  (E'Affordable Education', E'Making quality education accessible to all youth across the nation', E'Education', 95),
+  (E'Climate Action', E'Implementing sustainable policies to combat climate change', E'Environment', 90),
+  (E'Healthcare for All', E'Ensuring universal healthcare coverage for youth and families', E'Healthcare', 85),
+  (E'Job Creation', E'Creating millions of new job opportunities in coming years', E'Economy', 88),
+  (E'Digital Infrastructure', E'Expanding broadband and digital access to rural areas', E'Technology', 80),
+  (E'Agricultural Support', E'Direct support and subsidies for young farmers', E'Agriculture', 75),
+  (E'Infrastructure Development', E'Building modern roads, railways and public transport', E'Infrastructure', 82),
+  (E'Justice Reform', E'Fast-track justice system reform for youth-related cases', E'Justice', 78)
 ON CONFLICT DO NOTHING;
