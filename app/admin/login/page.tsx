@@ -22,6 +22,8 @@ export default function AdminLoginPage() {
     setLoading(true)
 
     try {
+      console.log('[v0] Attempting admin login for:', email)
+      
       // Login via Supabase Auth
       const { data, error: loginError } = await supabase.auth.signInWithPassword({
         email,
@@ -29,20 +31,31 @@ export default function AdminLoginPage() {
       })
 
       if (loginError) {
+        console.error('[v0] Auth error:', loginError)
         setError(loginError.message)
         setLoading(false)
         return
       }
 
+      console.log('[v0] Auth successful, user ID:', data.user?.id)
+
       if (data.user) {
         // Check if user exists in admin_users table
+        console.log('[v0] Checking admin privileges for:', data.user.email)
         const { data: adminUser, error: adminError } = await supabase
           .from('admin_users')
           .select('*')
           .eq('email', data.user.email)
           .single()
 
-        if (adminError || !adminUser) {
+        if (adminError) {
+          console.error('[v0] Admin check error:', adminError)
+        }
+        
+        console.log('[v0] Admin user found:', adminUser)
+
+        if (!adminUser) {
+          console.warn('[v0] User is not an admin')
           setError('This account does not have admin privileges. Please use an admin account.')
           await supabase.auth.signOut()
           setLoading(false)
@@ -51,6 +64,7 @@ export default function AdminLoginPage() {
 
         // Admin exists in admin_users table, proceed to admin dashboard
         console.log('[v0] Admin login successful for:', data.user.email)
+        setError(null)
         router.push('/admin')
       } else {
         console.error('[v0] No user data returned from login')
@@ -58,7 +72,7 @@ export default function AdminLoginPage() {
       }
     } catch (err) {
       console.error('[v0] Login error:', err)
-      setError('An unexpected error occurred')
+      setError('An unexpected error occurred: ' + (err instanceof Error ? err.message : 'Unknown error'))
     } finally {
       setLoading(false)
     }
