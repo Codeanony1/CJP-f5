@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Mail } from 'lucide-react'
 
 const INDIAN_STATES = [
   // States
@@ -43,6 +44,7 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -89,7 +91,6 @@ export default function SignUpPage() {
         email: formData.email,
         password: formData.password,
         options: {
-          // Disable email verification - auto confirm
           emailRedirectTo:
             process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/callback`,
           data: {
@@ -104,7 +105,6 @@ export default function SignUpPage() {
       })
 
       if (signUpError) {
-        // Handle specific Supabase auth errors
         if (signUpError.message.includes('already registered')) {
           setError('An account with this email already exists. Please log in instead.')
         } else {
@@ -115,9 +115,6 @@ export default function SignUpPage() {
       }
       
       if (data.user) {
-        // Create or update user profile with demographic data using upsert
-        console.log('[v0] Creating/updating user profile for:', data.user.id)
-        
         const { error: profileError } = await supabase.from('users').upsert({
           id: data.user.id,
           email: formData.email,
@@ -132,12 +129,10 @@ export default function SignUpPage() {
 
         if (profileError) {
           console.error('[v0] Profile creation error:', profileError)
-          // Don't block registration if profile fails - trigger should have created it
         } else {
           console.log('[v0] Profile created/updated successfully')
         }
         
-        // Show success message and redirect to profile
         setSuccess('Registration successful! Welcome to the movement.')
         setTimeout(() => {
           router.push('/profile')
@@ -148,6 +143,32 @@ export default function SignUpPage() {
       setError('An unexpected error occurred. Please try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleGoogleSignUp = async () => {
+    setError(null)
+    setGoogleLoading(true)
+
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      })
+
+      if (error) {
+        setError(error.message)
+      }
+    } catch (err) {
+      setError('Failed to sign up with Google')
+    } finally {
+      setGoogleLoading(false)
     }
   }
 
@@ -287,6 +308,29 @@ export default function SignUpPage() {
               {loading ? 'Creating account...' : 'Create Account'}
             </Button>
           </form>
+
+          <div className="mt-4">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or</span>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full mt-4"
+              onClick={handleGoogleSignUp}
+              disabled={googleLoading}
+            >
+              <Mail className="mr-2 h-4 w-4" />
+              {googleLoading ? 'Signing up...' : 'Sign Up with Google'}
+            </Button>
+          </div>
+
           <div className="mt-6 space-y-2 text-center text-sm text-muted-foreground">
             <p>
               Already have an account?{' '}
