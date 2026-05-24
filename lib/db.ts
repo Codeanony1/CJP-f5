@@ -10,10 +10,10 @@ export async function getAgendas() {
   const { data, error } = await supabase
     .from('agendas')
     .select('*')
-    .order('priority', { ascending: false })
+    .order('priority', { ascending: true })
 
   if (error) {
-    console.error('Error fetching agendas:', error)
+    console.error('[v0] Error fetching agendas:', error)
     return []
   }
   return data || []
@@ -26,10 +26,52 @@ export async function getAgendaById(id: string) {
   const { data, error } = await supabase.from('agendas').select('*').eq('id', id).single()
 
   if (error) {
-    console.error('Error fetching agenda:', error)
+    console.error('[v0] Error fetching agenda:', error)
     return null
   }
   return data
+}
+
+export async function updateAgenda(
+  id: string,
+  title: string,
+  description: string,
+  category: string,
+  priority: number
+) {
+  const supabase = await createClient()
+  if (!supabase) return null
+
+  const { data, error } = await supabase
+    .from('agendas')
+    .update({
+      title,
+      description,
+      category,
+      priority,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+
+  if (error) {
+    console.error('[v0] Error updating agenda:', error)
+    return null
+  }
+  return data?.[0] || null
+}
+
+export async function deleteAgenda(id: string) {
+  const supabase = await createClient()
+  if (!supabase) return false
+
+  const { error } = await supabase.from('agendas').delete().eq('id', id)
+
+  if (error) {
+    console.error('[v0] Error deleting agenda:', error)
+    return false
+  }
+  return true
 }
 
 // Youth Voices functions
@@ -42,16 +84,16 @@ export async function getApprovedVoices() {
     .select(
       `
       *,
-      user:users(id, full_name, email),
-      comments:voice_comments(count),
-      upvotes:voice_upvotes(count)
+      users(id, full_name, email),
+      voice_comments(count),
+      voice_upvotes(count)
     `
     )
     .eq('status', 'APPROVED')
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching voices:', error)
+    console.error('[v0] Error fetching voices:', error)
     return []
   }
   return data || []
@@ -66,15 +108,15 @@ export async function getUserVoices(userId: string) {
     .select(
       `
       *,
-      comments:voice_comments(count),
-      upvotes:voice_upvotes(count)
+      voice_comments(count),
+      voice_upvotes(count)
     `
     )
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching user voices:', error)
+    console.error('[v0] Error fetching user voices:', error)
     return []
   }
   return data || []
@@ -103,7 +145,7 @@ export async function submitVoice(
     .select()
 
   if (error) {
-    console.error('Error submitting voice:', error)
+    console.error('[v0] Error submitting voice:', error)
     return null
   }
   return data?.[0] || null
@@ -119,14 +161,13 @@ export async function getPendingVoices() {
     .select(
       `
       *,
-      user:users(id, full_name, email)
+      users(id, full_name, email)
     `
     )
-    .eq('status', 'PENDING')
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching pending voices:', error)
+    console.error('[v0] Error fetching pending voices:', error)
     return []
   }
   return data || []
@@ -138,11 +179,11 @@ export async function approveVoice(voiceId: string) {
 
   const { error } = await supabase
     .from('youth_voices')
-    .update({ status: 'APPROVED' })
+    .update({ status: 'APPROVED', updated_at: new Date().toISOString() })
     .eq('id', voiceId)
 
   if (error) {
-    console.error('Error approving voice:', error)
+    console.error('[v0] Error approving voice:', error)
     return false
   }
   return true
@@ -154,11 +195,11 @@ export async function rejectVoice(voiceId: string) {
 
   const { error } = await supabase
     .from('youth_voices')
-    .update({ status: 'REJECTED' })
+    .update({ status: 'REJECTED', updated_at: new Date().toISOString() })
     .eq('id', voiceId)
 
   if (error) {
-    console.error('Error rejecting voice:', error)
+    console.error('[v0] Error rejecting voice:', error)
     return false
   }
   return true
@@ -171,14 +212,17 @@ export async function createAgenda(
   priority: number = 100
 ) {
   const supabase = await createClient()
-  if (!supabase) return null
+  if (!supabase) {
+    console.error('[v0] Supabase client not available')
+    return null
+  }
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (!user) {
-    console.error('User not authenticated')
+    console.error('[v0] User not authenticated')
     return null
   }
 
@@ -196,7 +240,7 @@ export async function createAgenda(
     .select()
 
   if (error) {
-    console.error('Error creating agenda:', error)
+    console.error('[v0] Error creating agenda:', error)
     return null
   }
   return data?.[0] || null

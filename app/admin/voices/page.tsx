@@ -69,15 +69,21 @@ export default function VoiceModerationPage() {
         return
       }
 
-      // Fetch voices
-      const { data: voicesData } = await supabase
+      // Fetch all voices
+      console.log('[v0] Fetching voices for admin')
+      const { data: voicesData, error: voicesError } = await supabase
         .from('youth_voices')
-        .select('*, users(full_name, email)')
+        .select('*, users(id, full_name, email)')
         .order('created_at', { ascending: false })
 
-      if (voicesData) {
-        setVoices(voicesData as Voice[])
-        setFilteredVoices(voicesData as Voice[])
+      if (voicesError) {
+        console.error('[v0] Error fetching voices:', voicesError)
+      } else {
+        console.log('[v0] Fetched voices:', voicesData?.length || 0)
+        if (voicesData) {
+          setVoices(voicesData as Voice[])
+          setFilteredVoices(voicesData as Voice[])
+        }
       }
 
       setLoading(false)

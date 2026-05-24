@@ -101,14 +101,22 @@ export default function UsersPage() {
     setUpdateError(null)
     
     try {
-      const { error } = await supabase.from('users').update({ membership_status: newStatus }).eq('id', userId)
+      console.log('[v0] Updating user:', userId, 'to status:', newStatus)
+      const { error } = await supabase.from('users').update({ 
+        membership_status: newStatus,
+        membership_date: newStatus === 'VERIFIED' ? new Date().toISOString() : undefined
+      }).eq('id', userId)
 
       if (error) {
         console.error('[v0] Update error:', error)
         setUpdateError(`Failed to update status: ${error.message}`)
-      } else {
-        setUsers(users.map((u) => (u.id === userId ? { ...u, membership_status: newStatus } : u)))
+        setActionLoading(null)
+        return
       }
+      
+      console.log('[v0] Update successful for user:', userId)
+      setUsers(users.map((u) => (u.id === userId ? { ...u, membership_status: newStatus } : u)))
+      setUpdateError(null)
     } catch (err) {
       console.error('[v0] Unexpected error:', err)
       setUpdateError('An unexpected error occurred')
